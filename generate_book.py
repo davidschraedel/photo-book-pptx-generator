@@ -10,7 +10,7 @@ VALID_EXTENSIONS = {ext.lower() for ext in Image.registered_extensions().keys()}
 
 SOURCE_TEMPLATE = Path("book_template.pptx")
 PHOTOS_DIR = Path("photos/current")
-OUTPUT_FILE = Path(f"output/book_{PHOTOS_DIR.name}_generated.pptx")
+OUTPUT_FILE = Path(f"output/book_{PHOTOS_DIR.name}.pptx")
 
 MAX_PAGES = 70
 MAX_PHOTOS = MAX_PAGES * 4  # 280
