@@ -21,6 +21,7 @@ uv run generate_book.py
 ```
 
 3. Open `output/book_current.pptx`, export as PDF, and submit to your print service.
-4. Move used photos from `photos/current/` to `photos/used/`.
+
+Used photos are moved automatically after the book is saved into a new run folder under `photos/used/`, e.g. `photos/used/run_2026-03-20_143022/`. Names are kept as-is when possible; if a file already exists in that run folder, the mover appends a timestamp to the basename (e.g. `IMG_1234_2026-03-20_143022.123456.jpg`).
 
 The layout comes from `book_template.pptx` (included in the repo).

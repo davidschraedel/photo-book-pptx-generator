@@ -3,6 +3,8 @@ from PIL import Image
 from pptx import Presentation
 import io
 import rawpy
+import shutil
+from datetime import datetime
 
 # Ensure all image plugins are loaded before grabbing valid extensions
 Image.init()
@@ -10,10 +12,34 @@ VALID_EXTENSIONS = {ext.lower() for ext in Image.registered_extensions().keys()}
 
 SOURCE_TEMPLATE = Path("book_template.pptx")
 PHOTOS_DIR = Path("photos/current")
+PHOTOS_USED_DIR = Path("photos/used")
 OUTPUT_FILE = Path(f"output/book_{PHOTOS_DIR.name}.pptx")
 
 MAX_PAGES = 70
 MAX_PHOTOS = MAX_PAGES * 4  # 280
+
+def make_used_run_directory() -> Path:
+    """One folder per book run so filenames stay unchanged (no _2/_3 renaming)."""
+    PHOTOS_USED_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    run_dir = PHOTOS_USED_DIR / f"run_{stamp}"
+    n = 2
+    while run_dir.exists():
+        run_dir = PHOTOS_USED_DIR / f"run_{stamp}_{n}"
+        n += 1
+    run_dir.mkdir()
+    return run_dir
+
+def used_photo_dest(run_dir: Path, filename: str) -> Path:
+    dest = run_dir / filename
+    if not dest.exists():
+        return dest
+    path = Path(filename)
+    while True:
+        stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S.%f")
+        dest = run_dir / f"{path.stem}_{stamp}{path.suffix}"
+        if not dest.exists():
+            return dest
 
 def get_sorted_photos(folder: Path):
     if not folder.exists():
@@ -58,6 +84,8 @@ def main():
     
     print(f"Found {len(photos)} photos. Preparing to generate {len(groups)} slides.")
     print("-" * 40)
+
+    used_paths: list[Path] = []
 
     # Use enumerate to track the current slide number (starting at 1)
     for slide_num, group in enumerate(groups, start=1):
@@ -104,14 +132,40 @@ def main():
                             slide.shapes.add_picture(img_stream, left, top, width=w, height=h)
                     else:
                         raise
-            
+
+            used_paths.append(photo_path)
+
             # Remove empty placeholder outline
             ph._element.getparent().remove(ph._element)
 
     print("-" * 40)
     print("Saving presentation. This may take a moment depending on file size...")
     prs.save(OUTPUT_FILE)
-    print(f"Done: {len(photos)} photos across {len(groups)} pages -> {OUTPUT_FILE}")
+
+    if used_paths:
+        used_run_dir = make_used_run_directory()
+        moves = [(src, used_photo_dest(used_run_dir, src.name)) for src in used_paths]
+        print(f"Moving {len(moves)} used photo(s) to '{used_run_dir}'...")
+        moved = 0
+        for src, dest in moves:
+            try:
+                shutil.move(str(src), str(dest))
+            except OSError as e:
+                print("-" * 40)
+                print("ERROR: Photo move failed partway through.")
+                print(f"  Book already saved: {OUTPUT_FILE}")
+                print(f"  Run folder: {used_run_dir}")
+                print(f"  Moved {moved} of {len(moves)} photo(s).")
+                print(f"  Failed on: {src.name} -> {dest}")
+                print(f"  Reason: {e}")
+                raise SystemExit(1)
+            if dest.name == src.name:
+                print(f"  -> Moved: {src.name}")
+            else:
+                print(f"  -> Moved: {src.name} -> {dest.name} (name conflict)")
+            moved += 1
+
+    print(f"Done: {len(used_paths)} photos across {len(groups)} pages -> {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     main()
